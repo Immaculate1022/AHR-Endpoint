@@ -29,14 +29,14 @@ Detailed specifications and architectural guides are available in the `/docs` fo
 
 ## 🚀 Quick Start
 AHR-Endpoint is designed for rapid deployment.
-1.  **Clone the Repository**: `git clone https://github.com/YOUR_USERNAME/AHR-Endpoint.git`
+1.  **Clone the Repository**: `git clone https://github.com/Immaculate1022/AHR-Endpoint.git`
 2.  **Review the Engine**: Explore the core logic in `AHRengine.pdf`.
 3.  **Deploy Invariants**: See the `/invariants` directory for pre-configured defense patterns.
 
 ---
 
 ## 🔗 Powered by IOF Resonance
-AHR-Endpoint is a specialized implementation of the **[Infinite Optical Fabric (IOF)](https://github.com/YOUR_USERNAME/IOF-Resonance-Core)** architecture. It leverages high-dimensional resonance principles to achieve near-instantaneous network synchronization.
+AHR-Endpoint is a specialized implementation of the **[Infinite Optical Fabric (IOF)](https://github.com/Immaculate1022/IOF-Resonance-Core)** architecture. It leverages high-dimensional resonance principles to achieve near-instantaneous network synchronization.
 
 ---
 **Copyright 2026 Gregory Scott Davis**  
