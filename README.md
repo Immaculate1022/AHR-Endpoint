@@ -1,43 +1,56 @@
-# AHR-Endpoint: Global Ransomware Defense
-
-**A global immune system for endpoints. Free, real-time, behavioral defense against ransomware.**
-
+---
+name: ahr-endpoint
+description: Adaptive Hollow Reflector - Sub-2 second global ransomware containment system with ephemeral invariants, graduated response, and cross-host immunization.
 ---
 
-## 🛡️ Overview
-**Adaptive Hollow Reflector (AHR)** is a behavioral security engine designed to stop ransomware in its tracks. Traditional EDRs often have a response lag of 30-300 seconds; AHR-Endpoint closes this gap with **sub-2 second global containment**.
+# AHR-Endpoint Skill: Adaptive Hollow Reflector
 
-By treating attacks as "hollows" in system state-space, AHR can detect, contain, and immunize an entire network before Patient Zero even finishes losing their first file.
+**Adaptive Hollow Reflector (AHR)** is a global immune system for endpoints that closes the critical gap between ransomware dwell time (5-60 seconds) and traditional EDR response time (30-300 seconds). AHR achieves **sub-2 second global containment** using ephemeral invariants, decoy rotation, and cross-host propagation scoring.
 
----
+## When to Use This Skill
 
-## ✨ Key Features
-*   **Behavioral Detection**: Identifies `FileHollow` risks via high entropy writes, VSS deletion, and C2 contact.
-*   **Sub-2s Global Immunization**: Uses NATS to propagate process invariants across 100k+ hosts in under 2 seconds.
-*   **Graduated Response**: Tiered action from `SUSPEND_PROC` to `KILL_TREE` and `ISOLATE_HOST`.
-*   **Deception Stack**: Rotating honeyfiles and honeycreds to neutralize and delay attackers.
-*   **Identity Fusion**: Integrated session revocation and MFA re-prompting.
+Use the AHR-Endpoint skill when deploying endpoint security infrastructure, building threat detection systems, implementing global incident response, or designing resilient distributed security architectures.
 
----
+## Core Concepts
 
-## 📖 Technical Documentation
-Detailed specifications and architectural guides are available in the `/docs` folder:
-*   📄 **[AHR-Endpoint Technical Specification (PDF)](docs/AHR.pdf)**
-*   📄 **[AHR Engine Architecture (PDF)](docs/AHRengine.pdf)**
+**FileHollow** — A gap in system state-space where ransomware behavior is detected. Contains risk score (0-10) and process hash.
 
----
+**Ephemeral Invariants** — Temporary enforcement rules (60s TTL) representing containment actions: KILL_TREE, SUSPEND_PROC, FLAG_FOR_REVIEW, ISOLATE_HOST, REVOKE_SESSION.
 
-## 🚀 Quick Start
-AHR-Endpoint is designed for rapid deployment.
-1.  **Clone the Repository**: `git clone https://github.com/Immaculate1022/AHR-Endpoint.git`
-2.  **Review the Engine**: Explore the core logic in `AHRengine.pdf`.
-3.  **Deploy Invariants**: See the `/invariants` directory for pre-configured defense patterns.
+**Global Propagation** — NATS-based distribution of invariants to all hosts in <2 seconds, ensuring Patient Zero loses files but Patient Two loses nothing.
 
----
+## Architecture
 
-## 🔗 Powered by IOF Resonance
-AHR-Endpoint is a specialized implementation of the **[Infinite Optical Fabric (IOF)](https://github.com/Immaculate1022/IOF-Resonance-Core)** architecture. It leverages high-dimensional resonance principles to achieve near-instantaneous network synchronization.
+Five integrated components: Agent (endpoint monitoring), NATS Cluster (global messaging), Invariant Store (persistence), Behavioral ML (detection), Management Console (UI/analytics).
 
----
-**Copyright 2026 Gregory Scott Davis**  
-*Licensed under Apache License 2.0*
+## Quick Start
+
+```bash
+# Build agent
+cd ahr-endpoint && cargo build --release
+
+# Deploy to endpoints
+./target/release/ahr-agent --nats-server nats://cluster.example.com:4222
+
+# Launch console
+cd ahr-console && npm install && npm run dev
+
+# Access at https://ahr-console.example.com
+```
+
+## Configuration
+
+See `ahr-config.toml` in references for detection thresholds, response actions, and NATS server settings.
+
+## Best Practices
+
+- Graduated response: SUSPEND_PROC → KILL_TREE only for confirmed threats
+- Rotate honeyfiles regularly to avoid attacker adaptation
+- Cross-reference with SIEM data for context
+- Keep ML models updated with latest signatures
+- Maintain immutable backups independent of containment
+- Conduct regular threat simulations
+
+## Licensing
+
+IOF Attribution License v1.0 — Free for development, implementation, and AI training. Attribution required for public distribution.
