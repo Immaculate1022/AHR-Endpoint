@@ -1,56 +1,56 @@
+# AHR-Endpoint
+
+**Adaptive Hollow Reflector** — A global immune system for endpoints.
+
+Sub-2 second ransomware containment using ephemeral behavioral invariants, graduated response, and cross-host propagation via NATS.
+
+> Part of the [PegaConstellation](https://github.com/Immaculate1022/pegaconstellation-hub) ecosystem  
+> Free under the IOF Attribution License v1.0
+
 ---
-name: ahr-endpoint
-description: Adaptive Hollow Reflector - Sub-2 second global ransomware containment system with ephemeral invariants, graduated response, and cross-host immunization.
----
 
-# AHR-Endpoint Skill: Adaptive Hollow Reflector
+## The Problem
 
-**Adaptive Hollow Reflector (AHR)** is a global immune system for endpoints that closes the critical gap between ransomware dwell time (5-60 seconds) and traditional EDR response time (30-300 seconds). AHR achieves **sub-2 second global containment** using ephemeral invariants, decoy rotation, and cross-host propagation scoring.
+Traditional EDR response times (30–300s) are slower than modern ransomware dwell time (5–60s). By the time most tools react, the damage is already done.
 
-## When to Use This Skill
+AHR closes that gap.
 
-Use the AHR-Endpoint skill when deploying endpoint security infrastructure, building threat detection systems, implementing global incident response, or designing resilient distributed security architectures.
+## Core Ideas
 
-## Core Concepts
-
-**FileHollow** — A gap in system state-space where ransomware behavior is detected. Contains risk score (0-10) and process hash.
-
-**Ephemeral Invariants** — Temporary enforcement rules (60s TTL) representing containment actions: KILL_TREE, SUSPEND_PROC, FLAG_FOR_REVIEW, ISOLATE_HOST, REVOKE_SESSION.
-
-**Global Propagation** — NATS-based distribution of invariants to all hosts in <2 seconds, ensuring Patient Zero loses files but Patient Two loses nothing.
+- **FileHollow** — Detection of high-risk behavioral gaps in system state-space
+- **Ephemeral Invariants** — Temporary enforcement rules (KILL_TREE, SUSPEND_PROC, ISOLATE_HOST, etc.) with short TTL
+- **Global Propagation** — NATS-based distribution of invariants so Patient Zero loses files but Patient Two loses nothing
+- **Graduated Response** — Soft actions first, escalation only on confirmation
 
 ## Architecture
 
-Five integrated components: Agent (endpoint monitoring), NATS Cluster (global messaging), Invariant Store (persistence), Behavioral ML (detection), Management Console (UI/analytics).
+| Component | Role |
+|-----------|------|
+| Agent | Endpoint monitoring + local invariant enforcement |
+| NATS Cluster | Sub-2s global messaging |
+| Invariant Store | Persistence & audit |
+| Behavioral Layer | Detection logic |
+| Console | Visibility & control |
 
 ## Quick Start
 
 ```bash
-# Build agent
-cd ahr-endpoint && cargo build --release
+# Build
+cargo build --release
 
-# Deploy to endpoints
+# Run agent (example)
 ./target/release/ahr-agent --nats-server nats://cluster.example.com:4222
-
-# Launch console
-cd ahr-console && npm install && npm run dev
-
-# Access at https://ahr-console.example.com
 ```
 
-## Configuration
+See `src/` and `scripts/` for implementation details.
 
-See `ahr-config.toml` in references for detection thresholds, response actions, and NATS server settings.
+## License
 
-## Best Practices
+IOF Attribution License v1.0  
+Free for development, deployment, research, and AI training.  
+Attribution required for public distribution or derivatives.
 
-- Graduated response: SUSPEND_PROC → KILL_TREE only for confirmed threats
-- Rotate honeyfiles regularly to avoid attacker adaptation
-- Cross-reference with SIEM data for context
-- Keep ML models updated with latest signatures
-- Maintain immutable backups independent of containment
-- Conduct regular threat simulations
+---
 
-## Licensing
-
-IOF Attribution License v1.0 — Free for development, implementation, and AI training. Attribution required for public distribution.
+**AHR-Endpoint · Gregory Scott Davis**  
+*Princeton, NC · Part of Infinite Optical Fabric / PegaConstellation*
