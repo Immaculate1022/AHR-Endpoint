@@ -2,6 +2,12 @@
 name = "ahr-endpoint"
 version = "0.1.0"
 edition = "2021"
+description = "Adaptive Hollow Reflector — global immune system for endpoints. Sub-2s ransomware containment via behavioral invariants and NATS."
+license = "LicenseRef-IOF-Attribution-1.0"
+authors = ["Gregory Scott Davis <Princeton, NC>"]
+repository = "https://github.com/Immaculate1022/AHR-Endpoint"
+keywords = ["ransomware", "endpoint-security", "nats", "cybersecurity", "immune-system"]
+categories = ["network-programming", "os"]
 
 [dependencies]
 tokio = { version = "1", features = ["full"] }
