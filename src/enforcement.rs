@@ -1,12 +1,12 @@
 //! Graduated response enforcement for AHR-Endpoint.
 //!
-//! Soft  → log + optional SIGSTOP
-//! Medium → deny-style containment (userspace kill of children + SIGSTOP parent)
+//! Soft  → SIGSTOP
+//! Medium → SIGSTOP process tree
 //! Hard  → SIGKILL process tree + publish invariant
 //!
-//! When eBPF is loaded (see `ebpf/`), the same action codes are written into
-//! the kernel map so LSM / bpf_send_signal can act in microseconds.
+//! When eBPF is loaded, the same action codes are written into ACTION_MAP.
 
+use crate::action::Action;
 use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -15,26 +15,7 @@ use std::process::Command;
 use std::time::{Duration, Instant};
 use sysinfo::{ProcessesToUpdate, System};
 
-/// Action level stored in eBPF map (u8) and used by userspace fallback.
-#[repr(u8)]
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-pub enum Action {
-    Allow = 0,
-    Soft = 1,   // log / rate-limit / SIGSTOP
-    Medium = 2, // contain without full kill
-    Kill = 3,   // SIGKILL + tree
-}
-
-impl From<u8> for Action {
-    fn from(v: u8) -> Self {
-        match v {
-            1 => Action::Soft,
-            2 => Action::Medium,
-            3 => Action::Kill,
-            _ => Action::Allow,
-        }
-    }
-}
+pub use crate::action::Action;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EnforcementRecord {
@@ -42,20 +23,19 @@ pub struct EnforcementRecord {
     pub action: Action,
     pub reason: String,
     pub process_hash: String,
-    pub applied_at: u64, // unix secs
+    pub applied_at: u64,
     pub ttl_secs: u64,
 }
 
-/// In-memory flagged set (mirrors what will live in the eBPF HashMap).
+/// In-memory flagged set (mirrors eBPF HashMap).
 pub struct EnforcementController {
-    flagged: HashMap<u32, (Action, Instant, u64)>, // pid → (action, applied, ttl_secs)
+    flagged: HashMap<u32, (Action, Instant, u64)>,
     whitelist: Vec<u32>,
 }
 
 impl EnforcementController {
     pub fn new() -> Self {
         let mut whitelist = Vec::new();
-        // Never touch PID 1 or our own process
         whitelist.push(1);
         whitelist.push(std::process::id());
         Self {
@@ -68,7 +48,6 @@ impl EnforcementController {
         self.whitelist.contains(&pid)
     }
 
-    /// Flag a PID with an action and TTL (seconds).
     pub fn flag(&mut self, pid: u32, action: Action, ttl_secs: u64, reason: &str) {
         if self.is_whitelisted(pid) {
             warn!("Refusing to flag whitelisted PID {}", pid);
@@ -82,18 +61,20 @@ impl EnforcementController {
             .insert(pid, (action, Instant::now(), ttl_secs));
     }
 
-    /// Expire old entries.
-    pub fn sweep(&mut self) {
+    /// Expire old entries; returns PIDs that expired (for eBPF clear_action).
+    pub fn sweep(&mut self) -> Vec<u32> {
+        let mut expired = Vec::new();
         self.flagged.retain(|pid, (_, at, ttl)| {
             let keep = at.elapsed() < Duration::from_secs(*ttl);
             if !keep {
                 info!("TTL expired for PID {}", pid);
+                expired.push(*pid);
             }
             keep
         });
+        expired
     }
 
-    /// Apply userspace enforcement for a flagged PID (fallback when eBPF not loaded).
     pub fn apply_userspace(&self, pid: u32, action: Action) -> bool {
         if self.is_whitelisted(pid) {
             return false;
@@ -101,7 +82,7 @@ impl EnforcementController {
         match action {
             Action::Allow => true,
             Action::Soft => {
-                send_signal(pid, 19); // SIGSTOP
+                send_signal(pid, 19);
                 info!("Soft containment: SIGSTOP sent to PID {}", pid);
                 true
             }
@@ -121,7 +102,7 @@ impl EnforcementController {
             Action::Kill => {
                 let children = collect_descendants(pid);
                 for c in children.iter().rev() {
-                    send_signal(*c, 9); // SIGKILL
+                    send_signal(*c, 9);
                 }
                 send_signal(pid, 9);
                 warn!(
@@ -134,7 +115,6 @@ impl EnforcementController {
         }
     }
 
-    /// Map risk score (0–10) to graduated action.
     pub fn action_for_risk(risk: u8) -> Action {
         match risk {
             0..=3 => Action::Allow,
