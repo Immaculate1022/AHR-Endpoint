@@ -1,12 +1,14 @@
 //! AHR-Endpoint agent — Adaptive Hollow Reflector
 //!
 //! Userspace detection + graduated enforcement (SIGSTOP / process-tree SIGKILL).
-//! eBPF kernel enforcement lives in `ebpf/` and is loaded when available.
+//! Optional eBPF kernel path via `--features ebpf` + compiled object.
 
 mod detection;
+mod ebpf_loader;
 mod enforcement;
 
 use detection::{detect_ransomware_behavior, FileHollow};
+use ebpf_loader::load_optional;
 use enforcement::{Action, EnforcementController};
 use log::{error, info, warn};
 use nats::Options;
@@ -34,9 +36,10 @@ async fn publish_invariant(hollow: &FileHollow, action: Action, nc: &nats::Conne
 async fn main() {
     env_logger::init();
     info!("🚀 Adaptive Hollow Reflector Endpoint Agent starting...");
-    info!("   Graduated response: Soft → Medium → Kill (userspace + eBPF-ready)");
+    info!("   Graduated response: Soft → Medium → Kill");
 
     let mut controller = EnforcementController::new();
+    let mut ebpf = load_optional();
 
     // Optional NATS for global propagation
     let nc = match Options::new().connect("nats://localhost:4222") {
@@ -65,7 +68,14 @@ async fn main() {
                 &format!("risk={} name={}", hollow.risk, hollow.process_name),
             );
 
-            // Userspace enforcement (always available)
+            // Kernel path first (microsecond enforcement when loaded)
+            if let Some(ref mut enf) = ebpf {
+                if let Err(e) = enf.set_action(hollow.pid, action as u8) {
+                    warn!("eBPF map update failed: {e}");
+                }
+            }
+
+            // Userspace enforcement (always available; dual-path with eBPF)
             let ok = controller.apply_userspace(hollow.pid, action);
             if ok {
                 warn!(
@@ -78,10 +88,6 @@ async fn main() {
             if let Some(ref conn) = nc {
                 publish_invariant(&hollow, action, conn).await;
             }
-
-            // NOTE: When eBPF is loaded, also write (pid, action) into the
-            // kernel HashMap so LSM / bpf_send_signal enforce in-kernel.
-            // See docs/eBPF_Enforcement.md and ebpf/
         }
 
         sleep(Duration::from_secs(3)).await;
