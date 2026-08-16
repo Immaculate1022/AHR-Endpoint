@@ -32,7 +32,7 @@ const SIGKILL: u32 = 9;
 
 /// Example attachment: sys_enter_openat — any open by a flagged process.
 /// Replace / extend with LSM hooks (path_rename, file_permission) for
-//! preventive -EPERM when kernel supports BPF_PROG_TYPE_LSM.
+/// preventive -EPERM when kernel supports BPF_PROG_TYPE_LSM.
 #[tracepoint]
 pub fn sys_enter_openat(ctx: TracePointContext) -> u32 {
     match try_openat(ctx) {
@@ -41,15 +41,15 @@ pub fn sys_enter_openat(ctx: TracePointContext) -> u32 {
     }
 }
 
-fn try_openat(_ctx: TracePointContext) -> Result<u32, u32> {
+fn try_openat(ctx: TracePointContext) -> Result<u32, u32> {
     let pid_tgid = bpf_get_current_pid_tgid();
     let tgid = (pid_tgid >> 32) as u32;
 
     if let Some(action) = ACTION_MAP.get(&tgid) {
         if *action >= ACTION_KILL {
-            // Hard kill from kernel — process never completes the syscall cleanly
+            // Hard kill from kernel — process is stopped mid-syscall path
             let _ = bpf_send_signal(SIGKILL);
-            info!(&_ctx, "AHR eBPF: SIGKILL tgid={}", tgid);
+            info!(&ctx, "AHR eBPF: SIGKILL tgid={}", tgid);
         }
         // Soft/Medium: userspace already handled SIGSTOP; kernel path can
         // later return -EPERM via LSM for rename/write.
