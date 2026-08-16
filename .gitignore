@@ -1,0 +1,12 @@
+/target/
+**/*.rs.bk
+Cargo.lock
+.idea/
+.vscode/
+*.o
+*.so
+*.rlib
+*.dll
+*.dylib
+ahr-ebpf.o
+.DS_Store
