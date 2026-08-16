@@ -1,12 +1,12 @@
 [package]
 name = "ahr-endpoint"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
-description = "Adaptive Hollow Reflector — global immune system for endpoints. Sub-2s ransomware containment via behavioral invariants and NATS."
+description = "Adaptive Hollow Reflector — global immune system for endpoints. Sub-2s ransomware containment via behavioral invariants, graduated response, NATS, and eBPF kernel enforcement."
 license = "LicenseRef-IOF-Attribution-1.0"
 authors = ["Gregory Scott Davis <Princeton, NC>"]
 repository = "https://github.com/Immaculate1022/AHR-Endpoint"
-keywords = ["ransomware", "endpoint-security", "nats", "cybersecurity", "immune-system"]
+keywords = ["ransomware", "endpoint-security", "nats", "ebpf", "cybersecurity", "immune-system"]
 categories = ["network-programming", "os"]
 
 [dependencies]
@@ -19,3 +19,15 @@ log = "0.4"
 env_logger = "0.10"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
+
+# eBPF userspace loader (optional — enable with --features ebpf on Linux)
+# aya = { version = "0.13", optional = true }
+# aya-log = { version = "0.2", optional = true }
+
+[features]
+default = []
+# ebpf = ["aya", "aya-log"]
+
+[profile.release]
+lto = true
+codegen-units = 1
