@@ -2,10 +2,12 @@
 
 **Adaptive Hollow Reflector** — A global immune system for endpoints.
 
-Sub-2 second ransomware containment using ephemeral behavioral invariants, graduated response, and cross-host propagation via NATS.
+Sub-2 second ransomware containment using ephemeral behavioral invariants, **graduated response**, cross-host propagation via NATS, and **eBPF-ready kernel enforcement**.
 
 > Part of the [PegaConstellation](https://github.com/Immaculate1022/pegaconstellation-hub) ecosystem  
 > Free under the IOF Attribution License v1.0
+
+**Version 0.2.0** — userspace graduated enforcement is live; eBPF skeleton is in-tree.
 
 ---
 
@@ -18,52 +20,85 @@ AHR closes that gap.
 ## Core Ideas
 
 - **FileHollow** — Detection of high-risk behavioral gaps in system state-space
-- **Ephemeral Invariants** — Temporary enforcement rules (KILL_TREE, SUSPEND_PROC, ISOLATE_HOST, etc.) with short TTL
-- **Global Propagation** — NATS-based distribution of invariants so Patient Zero loses files but Patient Two loses nothing
-- **Graduated Response** — Soft actions first, escalation only on confirmation
+- **Ephemeral Invariants** — Temporary enforcement rules with short TTL
+- **Graduated Response** — Soft (SIGSTOP) → Medium (tree stop) → Kill (SIGKILL tree)
+- **Global Propagation** — NATS so Patient Zero is contained and peers are pre-armed
+- **Kernel path** — eBPF `ACTION_MAP` + `bpf_send_signal` / future LSM `-EPERM`
 
 ## Architecture
 
 | Component | Role |
 |-----------|------|
-| Agent | Endpoint monitoring + local invariant enforcement |
-| NATS Cluster | Sub-2s global messaging |
-| Invariant Store | Persistence & audit |
-| Behavioral Layer | Detection logic |
-| Console | Visibility & control |
+| Agent (`src/`) | Detection + graduated userspace enforcement |
+| `enforcement.rs` | Risk → Action, TTL flags, process-tree signals |
+| `detection.rs` | Behavioral heuristics |
+| NATS | Sub-2s invariant distribution |
+| `ebpf/` | Aya program: PID→action map, in-kernel SIGKILL |
+
+## Graduated response
+
+| Risk | Action | Behavior |
+|-----:|--------|----------|
+| 0–3 | Allow | No action |
+| 4–6 | Soft | SIGSTOP (reversible) |
+| 7–8 | Medium | SIGSTOP process tree |
+| 9–10 | Kill | SIGKILL process tree + NATS invariant |
+
+PID 1 and the agent itself are always whitelisted.
 
 ## Quick Start
 
 **Requirements**
-- Rust (stable, 1.70+)
-- Optional: a local NATS server for global propagation testing
+- Rust stable (1.70+)
+- Linux recommended for real signals / future eBPF
+- Optional: local NATS
 
 ```bash
-# Clone
 git clone https://github.com/Immaculate1022/AHR-Endpoint.git
 cd AHR-Endpoint
 
-# Build
 cargo build --release
 
-# Run the agent (standalone / local mode)
-# If no NATS is available it continues in detection-only mode
+# Standalone (no NATS)
 ./target/release/ahr-endpoint
 ```
 
-**With local NATS (optional)**
+**With NATS**
 
 ```bash
-# Start NATS (Docker example)
 docker run -d --name nats -p 4222:4222 nats:latest
-
-# Then run the agent – it will connect to nats://localhost:4222
 ./target/release/ahr-endpoint
 ```
 
-The current agent is a functional prototype: it polls process behavior, logs potential high-risk signals, and publishes invariants when NATS is present. Real kernel-level enforcement (eBPF / driver hooks) is the next layer.
+Run with logging:
 
-See `src/main.rs` for the core loop and `docs/` for design notes.
+```bash
+RUST_LOG=info ./target/release/ahr-endpoint
+```
+
+## eBPF (kernel enforcement)
+
+Skeleton lives in [`ebpf/`](ebpf/). Design notes: [`docs/eBPF_Enforcement.md`](docs/eBPF_Enforcement.md).
+
+- Userspace already enforces Soft/Medium/Kill via signals.
+- Kernel path adds microsecond `bpf_send_signal(SIGKILL)` when a flagged PID issues syscalls.
+- LSM deny (`-EPERM` on rename/write) is the next preventive step (kernel ≥ 5.7).
+
+Build notes and prerequisites are in `ebpf/README.md`.
+
+## Project layout
+
+```
+src/
+  main.rs           Agent loop
+  detection.rs      Behavioral scoring
+  enforcement.rs    Graduated response + tree kill
+ebpf/
+  src/main.rs       Aya eBPF program (ACTION_MAP + signal)
+  README.md         Build / load notes
+docs/
+  eBPF_Enforcement.md
+```
 
 ## License
 
