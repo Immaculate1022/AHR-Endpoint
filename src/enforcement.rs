@@ -10,6 +10,7 @@
 use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+#[cfg(not(unix))]
 use std::process::Command;
 use std::time::{Duration, Instant};
 use sysinfo::{ProcessesToUpdate, System};
@@ -100,13 +101,11 @@ impl EnforcementController {
         match action {
             Action::Allow => true,
             Action::Soft => {
-                // SIGSTOP — reversible
                 send_signal(pid, 19); // SIGSTOP
                 info!("Soft containment: SIGSTOP sent to PID {}", pid);
                 true
             }
             Action::Medium => {
-                // Stop parent + children, do not SIGKILL yet
                 let children = collect_descendants(pid);
                 for c in &children {
                     send_signal(*c, 19);
@@ -121,7 +120,6 @@ impl EnforcementController {
             }
             Action::Kill => {
                 let children = collect_descendants(pid);
-                // Kill children first, then parent (KILL_TREE)
                 for c in children.iter().rev() {
                     send_signal(*c, 9); // SIGKILL
                 }
@@ -148,7 +146,6 @@ impl EnforcementController {
 }
 
 fn send_signal(pid: u32, sig: i32) {
-    // Prefer libc kill; fall back to kill(1) for portability in prototype
     #[cfg(unix)]
     {
         unsafe {
@@ -185,7 +182,6 @@ fn collect_descendants(root: u32) -> Vec<u32> {
     out
 }
 
-// Minimal libc binding for kill on Unix
 #[cfg(unix)]
 mod libc {
     extern "C" {
