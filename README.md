@@ -34,15 +34,36 @@ AHR closes that gap.
 
 ## Quick Start
 
+**Requirements**
+- Rust (stable, 1.70+)
+- Optional: a local NATS server for global propagation testing
+
 ```bash
+# Clone
+git clone https://github.com/Immaculate1022/AHR-Endpoint.git
+cd AHR-Endpoint
+
 # Build
 cargo build --release
 
-# Run agent (example)
-./target/release/ahr-agent --nats-server nats://cluster.example.com:4222
+# Run the agent (standalone / local mode)
+# If no NATS is available it continues in detection-only mode
+./target/release/ahr-endpoint
 ```
 
-See `src/` and `scripts/` for implementation details.
+**With local NATS (optional)**
+
+```bash
+# Start NATS (Docker example)
+docker run -d --name nats -p 4222:4222 nats:latest
+
+# Then run the agent – it will connect to nats://localhost:4222
+./target/release/ahr-endpoint
+```
+
+The current agent is a functional prototype: it polls process behavior, logs potential high-risk signals, and publishes invariants when NATS is present. Real kernel-level enforcement (eBPF / driver hooks) is the next layer.
+
+See `src/main.rs` for the core loop and `docs/` for design notes.
 
 ## License
 
