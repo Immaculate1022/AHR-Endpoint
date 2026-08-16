@@ -1,8 +1,9 @@
 //! AHR-Endpoint agent — Adaptive Hollow Reflector
 //!
-//! Userspace detection + graduated enforcement (SIGSTOP / process-tree SIGKILL).
+//! Userspace detection + graduated enforcement.
 //! Optional eBPF kernel path via `--features ebpf` + compiled object.
 
+mod action;
 mod detection;
 mod ebpf_loader;
 mod enforcement;
@@ -41,7 +42,6 @@ async fn main() {
     let mut controller = EnforcementController::new();
     let mut ebpf = load_optional();
 
-    // Optional NATS for global propagation
     let nc = match Options::new().connect("nats://localhost:4222") {
         Ok(c) => {
             info!("Connected to NATS cluster for global immunization.");
@@ -53,9 +53,13 @@ async fn main() {
         }
     };
 
-    // Main detection + enforcement loop
     loop {
-        controller.sweep();
+        let expired = controller.sweep();
+        if let Some(ref mut enf) = ebpf {
+            for pid in expired {
+                let _ = enf.clear_action(pid);
+            }
+        }
 
         if let Some(hollow) = detect_ransomware_behavior() {
             let action = EnforcementController::action_for_risk(hollow.risk);
@@ -68,14 +72,12 @@ async fn main() {
                 &format!("risk={} name={}", hollow.risk, hollow.process_name),
             );
 
-            // Kernel path first (microsecond enforcement when loaded)
             if let Some(ref mut enf) = ebpf {
                 if let Err(e) = enf.set_action(hollow.pid, action as u8) {
                     warn!("eBPF map update failed: {e}");
                 }
             }
 
-            // Userspace enforcement (always available; dual-path with eBPF)
             let ok = controller.apply_userspace(hollow.pid, action);
             if ok {
                 warn!(
@@ -84,7 +86,6 @@ async fn main() {
                 );
             }
 
-            // Global propagation
             if let Some(ref conn) = nc {
                 publish_invariant(&hollow, action, conn).await;
             }
