@@ -1,53 +1,22 @@
-# AHR-Endpoint
+# PegaConstellation > IOF > AHR-Endpoint
 
-**Adaptive Hollow Reflector** — A global immune system for endpoints.
+**Adaptive Hollow Reflector (AHR)** is a Linux endpoint-security prototype for detecting ransomware-like behavior and routing signals through graduated response controls. It is part of the [PegaConstellation](https://github.com/Immaculate1022/pegaconstellation-hub) ecosystem.
 
-Sub-2 second ransomware containment using ephemeral behavioral invariants, **graduated response**, cross-host propagation via NATS, and **Aya eBPF kernel enforcement**.
+> **Status:** research prototype, version 0.2.1. The repository contains a userspace Rust agent, an optional Aya/eBPF loader path, and experimental enforcement code. The README describes intended behavior and build paths; it does not claim measured sub-second containment, production readiness, or universal ransomware detection.
 
-> Part of the [PegaConstellation](https://github.com/Immaculate1022/pegaconstellation-hub) ecosystem  
-> Free under the IOF Attribution License v1.0
+## What is here
 
-**Version 0.2.1** — userspace graduated enforcement + Aya loader wired.
+| Area | Current repository surface |
+|---|---|
+| Behavioral detection | Userspace heuristics in `src/detection.rs`, currently based on process names and resource pressure. |
+| Graduated enforcement | Risk-to-action logic and process-tree controls in `src/enforcement.rs` and `src/action.rs`. |
+| Cross-host signaling | NATS dependency and propagation scaffolding; deployment and latency claims still require measurement. |
+| Kernel path | Optional Aya loader plus an eBPF program under `ebpf/`; Linux toolchain and permissions are required. |
+| Research candidates | Versioned AHR scoring modules are preserved under [`docs/archive/`](docs/archive/), separate from the active engine. |
 
----
+## Quick start: userspace build
 
-## The Problem
-
-Traditional EDR response times (30–300s) are slower than modern ransomware dwell time (5–60s). By the time most tools react, the damage is already done.
-
-AHR closes that gap.
-
-## Core Ideas
-
-- **FileHollow** — Detection of high-risk behavioral gaps in system state-space
-- **Ephemeral Invariants** — Temporary enforcement rules with short TTL
-- **Graduated Response** — Soft (SIGSTOP) → Medium (tree stop) → Kill (SIGKILL tree)
-- **Global Propagation** — NATS so Patient Zero is contained and peers are pre-armed
-- **Kernel path** — Aya loader → `ACTION_MAP` + `bpf_send_signal` on flagged syscalls
-
-## Architecture
-
-| Component | Role |
-|-----------|------|
-| Agent (`src/`) | Detection + graduated userspace enforcement |
-| `ebpf_loader.rs` | Aya load / attach / map write (`--features ebpf`) |
-| `enforcement.rs` | Risk → Action, TTL flags, process-tree signals |
-| `detection.rs` | Behavioral heuristics |
-| NATS | Sub-2s invariant distribution |
-| `ebpf/` | Aya program: PID→action map, in-kernel SIGKILL |
-
-## Graduated response
-
-| Risk | Action | Behavior |
-|-----:|--------|----------|
-| 0–3 | Allow | No action |
-| 4–6 | Soft | SIGSTOP (reversible) |
-| 7–8 | Medium | SIGSTOP process tree |
-| 9–10 | Kill | SIGKILL process tree + eBPF map + NATS |
-
-PID 1 and the agent itself are always whitelisted.
-
-## Quick Start (userspace)
+The smallest path is a normal Rust build on a supported platform with a stable toolchain:
 
 ```bash
 git clone https://github.com/Immaculate1022/AHR-Endpoint.git
@@ -56,69 +25,82 @@ cargo build --release
 RUST_LOG=info ./target/release/ahr-endpoint
 ```
 
-Optional NATS:
+Run the test suite before making changes:
 
 ```bash
-docker run -d --name nats -p 4222:4222 nats:latest
+cargo test
 ```
 
-## eBPF kernel path (Aya loader)
+The agent is a prototype and should be exercised in an isolated test environment. Do not point it at production endpoints until its detection thresholds, response policy, audit trail, and rollback behavior have been reviewed.
 
-### 1. Build the agent with the loader
+## Optional NATS path
+
+The project includes NATS-related scaffolding for cross-host signaling. A local NATS container can be started for development:
+
+```bash
+docker run --rm --name ahr-nats -p 4222:4222 nats:latest
+```
+
+Treat this as a development dependency. The repository does not currently provide a complete production topology, authentication policy, or measured propagation benchmark.
+
+## Optional eBPF path
+
+The kernel path is Linux-only and requires a compatible kernel, Rust nightly components, `rust-src`, `bpf-linker`, and suitable privileges. Start with the setup helper:
 
 ```bash
 cargo build --release --features ebpf
-```
-
-### 2. Build the eBPF object (Linux + nightly + bpf-linker)
-
-```bash
 bash scripts/setup_ebpf.sh
-# then compile the program in ebpf/ (see ebpf/README.md)
-# place the object where the loader can find it:
-#   ./ahr-ebpf.o
-#   or export AHR_EBPF_OBJECT=/path/to/object
-```
-
-### 3. Run as root (CAP_BPF)
-
-```bash
 sudo RUST_LOG=info ./target/release/ahr-endpoint
 ```
 
-On start you should see either:
+Read [`docs/eBPF_Enforcement.md`](docs/eBPF_Enforcement.md) and [`ebpf/README.md`](ebpf/README.md) before attempting a kernel build. The userspace fallback should remain available while the eBPF object and loader are being tested.
 
-- `Kernel eBPF enforcement: ACTIVE` — map writes + in-kernel SIGKILL armed  
-- `Kernel eBPF enforcement: inactive (...)` — userspace-only fallback (still safe)
+## Detection and response model
 
-Object search order: `$AHR_EBPF_OBJECT` → `./ahr-ebpf.o` → `./target/bpfel-unknown-none/release/ahr-ebpf` → `/usr/lib/ahr-endpoint/ahr-ebpf.o`
+The active detector is intentionally modest: it combines suspicious process-name indicators with CPU and memory pressure, then returns a `FileHollow` record. This is a starting point, not a complete behavioral ransomware detector.
 
-Design notes: [`docs/eBPF_Enforcement.md`](docs/eBPF_Enforcement.md)
+Response actions are consequential. Any extension that can stop processes, kill a process tree, isolate a host, revoke a session, quarantine a file, or capture memory should be treated as a recommendation until policy gates, dry-run mode, audit logging, human review, and false-positive tests exist.
 
-## Project layout
+| Stage | Intended meaning |
+|---|---|
+| Observe | Record a signal and retain context. |
+| Suspend | Apply a reversible process-level intervention in a controlled test. |
+| Isolate | Remove a host from relevant network paths only under explicit policy. |
+| Terminate | Kill a process tree only after a high-confidence, reviewed decision. |
 
-```
+## Repository layout
+
+```text
 src/
-  main.rs           Agent loop + dual-path enforcement
-  detection.rs      Behavioral scoring
-  enforcement.rs    Graduated response + tree kill
-  ebpf_loader.rs    Aya load / attach / ACTION_MAP writes
+  main.rs           Agent loop and runtime wiring
+  detection.rs      Current userspace behavioral heuristics
+  enforcement.rs    Graduated response and process controls
+  action.rs         Action definitions
+  ebpf_loader.rs    Optional Aya loader path
 ebpf/
-  src/main.rs       Kernel program (tracepoint + signal)
-  README.md         BPF build notes
+  src/main.rs       Kernel-side prototype
+  README.md         eBPF build notes
 docs/
   eBPF_Enforcement.md
+  archive/          Unmerged research candidates and review notes
 scripts/
-  setup_ebpf.sh
+  setup_ebpf.sh     Linux/nightly/bpf-linker setup helper
 ```
 
-## License
+## Research archive
 
-IOF Attribution License v1.0  
-Free for development, deployment, research, and AI training.  
-Attribution required for public distribution or derivatives.
+The [version 05 candidate](docs/archive/Pasted_content_05_hollow.rs) introduced expanded telemetry fields and risk scoring. The [version 06 candidate](docs/archive/Pasted_content_06_hollow.rs) adds score explanations, decoy suppression, injection-API signals, privilege-aware recommendations, companion actions, and unit tests. Neither candidate is merged into the active engine.
 
----
+## Attribution and license
+
+This repository is distributed under the [IOF Attribution License v1.0](LICENSE). Attribution is required for public distribution or derivatives. The license does not turn prototype behavior or performance statements into validated results.
 
 **AHR-Endpoint · Gregory Scott Davis**  
-*Princeton, NC · Part of Infinite Optical Fabric / PegaConstellation*
+*Part of the Infinite Optical Fabric / PegaConstellation research constellation.*
+
+## Related project links
+
+- [PegaConstellation Hub](https://github.com/Immaculate1022/pegaconstellation-hub)
+- [IOF Resonance Core](https://github.com/Immaculate1022/IOF-Resonance-Core)
+- [Sovereign Reality Engine](https://github.com/Immaculate1022/sovereign-reality-engine)
+- [PegaConstellation Documentation](https://github.com/Immaculate1022/docs)
