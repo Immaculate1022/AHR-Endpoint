@@ -113,6 +113,6 @@ Use the source-level safety audit before an enforcement demo:
 python3 scripts/dry_run_audit.py
 ```
 
-The audit never imports or launches the agent. It verifies that `--dry-run` disables eBPF loading, NATS connection, process mutation, and invariant publication, and that `--once` is available for a bounded single-cycle run. A compiled runtime audit remains pending until the Rust toolchain is available.
+The audit never imports or launches the agent. It verifies that `--dry-run` disables eBPF loading, NATS connection, process mutation, and invariant publication, and that `--once` is available for a bounded single-cycle run. With the current stable Rust toolchain, `cargo fmt -- --check`, `cargo check`, and `cargo test` pass; the crate currently contains no Rust unit tests, so the test command reports zero tests. A runtime dry-run still requires an isolated environment and must not be confused with an enforcement validation.
 
 The archived scoring candidates are indexed in [`docs/archive/README.md`](docs/archive/README.md) and are intentionally outside the active Cargo source path. The candidate modules must not be merged into enforcement until they have compatibility tests, structured audit logging, false-positive review, explicit dry-run behavior, and human authorization for consequential actions.
