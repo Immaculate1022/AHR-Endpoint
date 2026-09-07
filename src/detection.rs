@@ -7,7 +7,7 @@
 use log::info;
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
-use sysinfo::{ProcessesToUpdate, System};
+use sysinfo::System;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct FileHollow {
@@ -20,10 +20,10 @@ pub struct FileHollow {
 /// Scan running processes for high-risk behavioral signals.
 pub fn detect_ransomware_behavior() -> Option<FileHollow> {
     let mut sys = System::new_all();
-    sys.refresh_processes(ProcessesToUpdate::All, true);
+    sys.refresh_processes();
 
     for (pid, process) in sys.processes() {
-        let name = process.name().to_string_lossy().to_string();
+        let name = process.name().to_string();
         let name_l = name.to_lowercase();
 
         // Suspicious name indicators (prototype)
@@ -56,9 +56,7 @@ pub fn detect_ransomware_behavior() -> Option<FileHollow> {
 
             info!(
                 "Potential ransomware signal: {} (PID {}) risk={}",
-                name,
-                pid,
-                risk
+                name, pid, risk
             );
 
             return Some(FileHollow {

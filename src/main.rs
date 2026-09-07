@@ -55,14 +55,14 @@ async fn main() {
         None
     } else {
         match Options::new().connect("nats://localhost:4222") {
-        Ok(c) => {
-            info!("Connected to NATS cluster for global immunization.");
-            Some(c)
-        }
-        Err(e) => {
-            warn!("NATS not available (standalone mode): {}", e);
-            None
-        }
+            Ok(c) => {
+                info!("Connected to NATS cluster for global immunization.");
+                Some(c)
+            }
+            Err(e) => {
+                warn!("NATS not available (standalone mode): {}", e);
+                None
+            }
         }
     };
 

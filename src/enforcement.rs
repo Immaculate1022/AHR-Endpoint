@@ -6,14 +6,13 @@
 //!
 //! When eBPF is loaded, the same action codes are written into ACTION_MAP.
 
-use crate::action::Action;
 use log::{info, warn};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 #[cfg(not(unix))]
 use std::process::Command;
 use std::time::{Duration, Instant};
-use sysinfo::{ProcessesToUpdate, System};
+use sysinfo::System;
 
 pub use crate::action::Action;
 
@@ -57,8 +56,7 @@ impl EnforcementController {
             "Flagging PID {} → {:?} (ttl={}s) reason={}",
             pid, action, ttl_secs, reason
         );
-        self.flagged
-            .insert(pid, (action, Instant::now(), ttl_secs));
+        self.flagged.insert(pid, (action, Instant::now(), ttl_secs));
     }
 
     /// Expire old entries; returns PIDs that expired (for eBPF clear_action).
@@ -143,7 +141,7 @@ fn send_signal(pid: u32, sig: i32) {
 
 fn collect_descendants(root: u32) -> Vec<u32> {
     let mut sys = System::new_all();
-    sys.refresh_processes(ProcessesToUpdate::All, true);
+    sys.refresh_processes();
     let mut out = Vec::new();
     let mut stack = vec![root];
     while let Some(p) = stack.pop() {

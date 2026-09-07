@@ -32,3 +32,8 @@ ebpf = ["aya", "aya-log", "libc"]
 [profile.release]
 lto = true
 codegen-units = 1
+
+# nats 0.24.1 permits rand >=0.8 for nuid, which resolves to rand 0.10
+# and breaks nuid's rand 0.8 API usage. Keep the dependency graph reproducible.
+[patch.crates-io]
+nuid = { path = "vendor/nuid" }

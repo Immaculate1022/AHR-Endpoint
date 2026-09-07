@@ -14,11 +14,7 @@ use log::{info, warn};
 #[cfg(feature = "ebpf")]
 mod imp {
     use super::*;
-    use aya::{
-        maps::HashMap as EbpfHashMap,
-        programs::TracePoint,
-        Ebpf,
-    };
+    use aya::{maps::HashMap as EbpfHashMap, programs::TracePoint, Ebpf};
     use std::path::{Path, PathBuf};
 
     pub struct EbpfEnforcer {
@@ -48,9 +44,7 @@ mod imp {
                 .try_into()
                 .map_err(|e| format!("program type: {e}"))?;
 
-            program
-                .load()
-                .map_err(|e| format!("program.load: {e}"))?;
+            program.load().map_err(|e| format!("program.load: {e}"))?;
             program
                 .attach("syscalls", "sys_enter_openat")
                 .map_err(|e| format!("program.attach: {e}"))?;
