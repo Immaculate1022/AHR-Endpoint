@@ -36,7 +36,7 @@ report = {
     "passed": all(checks.values()),
     "notes": [
         "This audit verifies source-level safety gates; it is not a behavioral detection benchmark.",
-        "A compiled Rust run remains pending until cargo/rustc is available.",
+        "This script does not compile or launch Rust; cargo fmt, cargo check, and cargo test were verified separately at the published commit.",
         "Archived scoring candidates remain outside the active crate path.",
     ],
 }
