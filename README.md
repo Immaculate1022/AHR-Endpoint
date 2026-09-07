@@ -104,3 +104,15 @@ This repository is distributed under the [IOF Attribution License v1.0](LICENSE)
 - [IOF Resonance Core](https://github.com/Immaculate1022/IOF-Resonance-Core)
 - [Sovereign Reality Engine](https://github.com/Immaculate1022/sovereign-reality-engine)
 - [PegaConstellation Documentation](https://github.com/Immaculate1022/docs)
+
+## Dry-run audit path
+
+Use the source-level safety audit before an enforcement demo:
+
+```bash
+python3 scripts/dry_run_audit.py
+```
+
+The audit never imports or launches the agent. It verifies that `--dry-run` disables eBPF loading, NATS connection, process mutation, and invariant publication, and that `--once` is available for a bounded single-cycle run. A compiled runtime audit remains pending until the Rust toolchain is available.
+
+The archived scoring candidates are indexed in [`docs/archive/README.md`](docs/archive/README.md) and are intentionally outside the active Cargo source path. The candidate modules must not be merged into enforcement until they have compatibility tests, structured audit logging, false-positive review, explicit dry-run behavior, and human authorization for consequential actions.

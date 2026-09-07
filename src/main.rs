@@ -2,6 +2,9 @@
 //!
 //! Userspace detection + graduated enforcement.
 //! Optional eBPF kernel path via `--features ebpf` + compiled object.
+//!
+//! Safety: pass `--dry-run` to evaluate detections and report intended actions
+//! without writing eBPF state, mutating processes, or publishing invariants.
 
 mod action;
 mod detection;
@@ -36,13 +39,22 @@ async fn publish_invariant(hollow: &FileHollow, action: Action, nc: &nats::Conne
 #[tokio::main]
 async fn main() {
     env_logger::init();
+    let args: Vec<String> = std::env::args().collect();
+    let dry_run = args.iter().any(|arg| arg == "--dry-run");
+    let once = args.iter().any(|arg| arg == "--once");
     info!("🚀 Adaptive Hollow Reflector Endpoint Agent starting...");
     info!("   Graduated response: Soft → Medium → Kill");
+    if dry_run {
+        info!("   DRY-RUN: no eBPF writes, process signals, or NATS invariants will be emitted");
+    }
 
     let mut controller = EnforcementController::new();
-    let mut ebpf = load_optional();
+    let mut ebpf = if dry_run { None } else { load_optional() };
 
-    let nc = match Options::new().connect("nats://localhost:4222") {
+    let nc = if dry_run {
+        None
+    } else {
+        match Options::new().connect("nats://localhost:4222") {
         Ok(c) => {
             info!("Connected to NATS cluster for global immunization.");
             Some(c)
@@ -50,6 +62,7 @@ async fn main() {
         Err(e) => {
             warn!("NATS not available (standalone mode): {}", e);
             None
+        }
         }
     };
 
@@ -65,32 +78,52 @@ async fn main() {
             let action = EnforcementController::action_for_risk(hollow.risk);
             let ttl = 60u64;
 
-            controller.flag(
-                hollow.pid,
-                action,
-                ttl,
-                &format!("risk={} name={}", hollow.risk, hollow.process_name),
-            );
-
-            if let Some(ref mut enf) = ebpf {
-                if let Err(e) = enf.set_action(hollow.pid, action as u8) {
-                    warn!("eBPF map update failed: {e}");
-                }
-            }
-
-            let ok = controller.apply_userspace(hollow.pid, action);
-            if ok {
-                warn!(
-                    "Containment activated — PID {} action={:?} (Patient Zero)",
-                    hollow.pid, action
+            if dry_run {
+                info!(
+                    "DRY-RUN would flag PID {} action={:?} ttl={} reason=risk={} name={}",
+                    hollow.pid, action, ttl, hollow.risk, hollow.process_name
+                );
+            } else {
+                controller.flag(
+                    hollow.pid,
+                    action,
+                    ttl,
+                    &format!("risk={} name={}", hollow.risk, hollow.process_name),
                 );
             }
 
-            if let Some(ref conn) = nc {
-                publish_invariant(&hollow, action, conn).await;
+            if !dry_run {
+                if let Some(ref mut enf) = ebpf {
+                    if let Err(e) = enf.set_action(hollow.pid, action as u8) {
+                        warn!("eBPF map update failed: {e}");
+                    }
+                }
+            }
+
+            if dry_run {
+                info!(
+                    "DRY-RUN decision: PID {} action={:?} risk={} process={}",
+                    hollow.pid, action, hollow.risk, hollow.process_name
+                );
+            } else {
+                let ok = controller.apply_userspace(hollow.pid, action);
+                if ok {
+                    warn!(
+                        "Containment activated — PID {} action={:?} (Patient Zero)",
+                        hollow.pid, action
+                    );
+                }
+
+                if let Some(ref conn) = nc {
+                    publish_invariant(&hollow, action, conn).await;
+                }
             }
         }
 
+        if once {
+            info!("Single-cycle run complete");
+            break;
+        }
         sleep(Duration::from_secs(3)).await;
     }
 }
