@@ -1,39 +1,46 @@
-# PegaConstellation > IOF > AHR-Endpoint
+# AHR-Endpoint
 
-**Adaptive Hollow Reflector (AHR)** is a Linux endpoint-security prototype for detecting ransomware-like behavior and routing signals through graduated response controls. It is part of the [PegaConstellation](https://github.com/Immaculate1022/pegaconstellation-hub) ecosystem.
+**Adaptive Hollow Reflector (AHR)** is an experimental Rust endpoint-security agent for exploring ransomware-like process detection and graduated response controls on Linux. It is intended for security researchers and engineers using an isolated test environment. A safe first look is a single, non-enforcing dry run:
 
-> **Status:** research prototype, version 0.2.1. The repository contains a userspace Rust agent, an optional Aya/eBPF loader path, and experimental enforcement code. The README describes intended behavior and build paths; it does not claim measured sub-second containment, production readiness, or universal ransomware detection.
+```bash
+git clone https://github.com/Immaculate1022/AHR-Endpoint.git
+cd AHR-Endpoint
+RUST_LOG=info cargo run --release -- --dry-run --once
+```
+
+> **Status — research prototype (v0.2.1):** AHR has a userspace agent, an optional Aya/eBPF loader path, and experimental process-control code. It does **not** establish production readiness, universal ransomware detection, false-positive rates, or measured containment timing.
 
 ## What is here
 
 | Area | Current repository surface |
 |---|---|
-| Behavioral detection | Userspace heuristics in `src/detection.rs`, currently based on process names and resource pressure. |
+| Behavioral detection | Userspace heuristics in `src/detection.rs`, based on selected process-name indicators and CPU or memory pressure. |
 | Graduated enforcement | Risk-to-action logic and process-tree controls in `src/enforcement.rs` and `src/action.rs`. |
-| Cross-host signaling | NATS dependency and propagation scaffolding; deployment and latency claims still require measurement. |
-| Kernel path | Optional Aya loader plus an eBPF program under `ebpf/`; Linux toolchain and permissions are required. |
+| Cross-host signaling | NATS dependency and development scaffolding; deployment and latency claims require measurement. |
+| Kernel path | Optional Aya loader plus an eBPF prototype under `ebpf/`; a separately built object, Linux toolchain, and permissions are required. |
 | Research candidates | Versioned AHR scoring modules are preserved under [`docs/archive/`](docs/archive/), separate from the active engine. |
 
-## Quick start: userspace build
+## Quick start
 
-The smallest path is a normal Rust build on a supported platform with a stable toolchain:
+Install a current stable Rust toolchain, then use the dry-run command above. `--dry-run` evaluates the active detector and reports intended actions without loading eBPF, sending process signals, or publishing NATS invariants. `--once` completes one scan cycle and exits.
+
+The dry-run path is a source-level safety check, not an enforcement validation or a detection benchmark. To verify that the guards are present without compiling or launching the agent, run:
 
 ```bash
-git clone https://github.com/Immaculate1022/AHR-Endpoint.git
-cd AHR-Endpoint
+python3 scripts/dry_run_audit.py
+```
+
+To build the userspace binary without running it:
+
+```bash
 cargo build --release
-RUST_LOG=info ./target/release/ahr-endpoint
 ```
 
-Run the test suite before making changes:
+Without `--dry-run`, a matching signal can lead to `SIGSTOP` or `SIGKILL` actions. Exercise only in an isolated environment after reviewing detection thresholds, response policy, audit logging, and rollback behavior.
 
-```bash
-cargo test
-```
+## Optional paths
 
-The agent is a prototype and should be exercised in an isolated test environment. Do not point it at production endpoints until its detection thresholds, response policy, audit trail, and rollback behavior have been reviewed.
-
-## Optional NATS path
+### NATS development scaffolding
 
 The project includes NATS-related scaffolding for cross-host signaling. A local NATS container can be started for development:
 
@@ -41,31 +48,30 @@ The project includes NATS-related scaffolding for cross-host signaling. A local 
 docker run --rm --name ahr-nats -p 4222:4222 nats:latest
 ```
 
-Treat this as a development dependency. The repository does not currently provide a complete production topology, authentication policy, or measured propagation benchmark.
+Treat this as a development dependency. The repository does not provide a complete production topology, authentication policy, or measured propagation benchmark.
 
-## Optional eBPF path
+### Experimental eBPF path
 
-The kernel path is Linux-only and requires a compatible kernel, Rust nightly components, `rust-src`, `bpf-linker`, and suitable privileges. Start with the setup helper:
+The kernel path is Linux-only and requires a compatible kernel, Rust nightly components, `rust-src`, `bpf-linker`, suitable privileges, and an eBPF object. This repository does not provide a reproducible in-repo BPF object or CI artifact. Start by reading the build notes and, if appropriate for a disposable lab host, installing the helper prerequisites:
 
 ```bash
-cargo build --release --features ebpf
 bash scripts/setup_ebpf.sh
-sudo RUST_LOG=info ./target/release/ahr-endpoint
+cargo build --release --features ebpf
 ```
 
-Read [`docs/eBPF_Enforcement.md`](docs/eBPF_Enforcement.md) and [`ebpf/README.md`](ebpf/README.md) before attempting a kernel build. The userspace fallback should remain available while the eBPF object and loader are being tested.
+Read [`docs/eBPF_Enforcement.md`](docs/eBPF_Enforcement.md), [`ebpf/README.md`](ebpf/README.md), and [`scripts/build_ebpf.sh`](scripts/build_ebpf.sh) before attempting a kernel build. Set `AHR_EBPF_OBJECT` to a compatible object before trying the loader. The userspace fallback remains available if the loader cannot attach.
 
 ## Detection and response model
 
-The active detector is intentionally modest: it combines suspicious process-name indicators with CPU and memory pressure, then returns a `FileHollow` record. This is a starting point, not a complete behavioral ransomware detector.
+The active detector is intentionally modest: it combines selected suspicious process-name indicators with CPU or memory pressure, then returns a `FileHollow` record. This is a starting point, not a complete behavioral ransomware detector.
 
-Response actions are consequential. Any extension that can stop processes, kill a process tree, isolate a host, revoke a session, quarantine a file, or capture memory should be treated as a recommendation until policy gates, dry-run mode, audit logging, human review, and false-positive tests exist.
+Current userspace responses can stop a process or stop/kill a process tree. Host isolation, session revocation, file quarantine, and memory capture are not active-engine responses. All consequential use needs policy gates, dry-run review, audit logging, human review, and false-positive testing.
 
 | Stage | Intended meaning |
 |---|---|
 | Observe | Record a signal and retain context. |
 | Suspend | Apply a reversible process-level intervention in a controlled test. |
-| Isolate | Remove a host from relevant network paths only under explicit policy. |
+| Isolate | A planned policy concept; active host-isolation behavior is not implemented. |
 | Terminate | Kill a process tree only after a high-confidence, reviewed decision. |
 
 ## Repository layout
@@ -91,28 +97,28 @@ scripts/
 
 The [version 05 candidate](docs/archive/Pasted_content_05_hollow.rs) introduced expanded telemetry fields and risk scoring. The [version 06 candidate](docs/archive/Pasted_content_06_hollow.rs) adds score explanations, decoy suppression, injection-API signals, privilege-aware recommendations, companion actions, and unit tests. Neither candidate is merged into the active engine.
 
-## Attribution and license
+## License and attribution
 
-This repository is distributed under the [IOF Attribution License v1.0](LICENSE). Attribution is required for public distribution or derivatives. The license does not turn prototype behavior or performance statements into validated results.
+This repository is distributed under the [IOF Attribution License v1.0](LICENSE). It permits use, copying, modification, publication, distribution, sublicensing, and deployment; any public use, derivative work, or implementation must clearly attribute **“AHR-Endpoint / Adaptive Hollow Reflector by Gregory Scott Davis, Princeton, NC.”** See [`LICENSE`](LICENSE) for the complete terms and warranty disclaimer.
 
 **AHR-Endpoint · Gregory Scott Davis**  
 *Part of the Infinite Optical Fabric / PegaConstellation research constellation.*
 
 ## Related project links
 
-- [PegaConstellation Hub](https://github.com/Immaculate1022/pegaconstellation-hub)
+- [PegaConstellation Hub](https://github.com/Immaculate1022/pegaconstellation-hub) — the ecosystem hub referenced above
 - [IOF Resonance Core](https://github.com/Immaculate1022/IOF-Resonance-Core)
 - [Sovereign Reality Engine](https://github.com/Immaculate1022/sovereign-reality-engine)
 - [PegaConstellation Documentation](https://github.com/Immaculate1022/docs)
 
 ## Dry-run audit path
 
-Use the source-level safety audit before an enforcement demo:
+The source-level audit checks the presence of the dry-run and single-cycle guards:
 
 ```bash
 python3 scripts/dry_run_audit.py
 ```
 
-The audit never imports or launches the agent. It verifies that `--dry-run` disables eBPF loading, NATS connection, process mutation, and invariant publication, and that `--once` is available for a bounded single-cycle run. With the current stable Rust toolchain, `cargo fmt -- --check`, `cargo check`, and `cargo test` pass; the crate currently contains no Rust unit tests, so the test command reports zero tests. A runtime dry-run still requires an isolated environment and must not be confused with an enforcement validation.
+The audit never imports or launches the agent. It verifies that `--dry-run` disables eBPF loading, NATS connection, process mutation, and invariant publication, and that `--once` is available for a bounded single-cycle run. A runtime dry run still requires an isolated environment and must not be confused with an enforcement validation.
 
 The archived scoring candidates are indexed in [`docs/archive/README.md`](docs/archive/README.md) and are intentionally outside the active Cargo source path. The candidate modules must not be merged into enforcement until they have compatibility tests, structured audit logging, false-positive review, explicit dry-run behavior, and human authorization for consequential actions.
