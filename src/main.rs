@@ -84,6 +84,10 @@ async fn main() {
                     hollow.pid, action, ttl, hollow.risk, hollow.process_name
                 );
             } else {
+                // Moving-target defense: jitter dispatch timing so response
+                // latency can't be used to fingerprint risk thresholds.
+                // Detection stays deterministic; only dispatch timing varies.
+                sleep(hollow.dispatch_delay()).await;
                 controller.flag(
                     hollow.pid,
                     action,
