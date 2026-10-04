@@ -1,6 +1,6 @@
 [package]
 name = "ahr-endpoint"
-version = "0.2.1"
+version = "0.3.0"
 edition = "2021"
 description = "Adaptive Hollow Reflector — global immune system for endpoints. Sub-2s ransomware containment via behavioral invariants, graduated response, NATS, and eBPF kernel enforcement."
 license = "LicenseRef-IOF-Attribution-1.0"
