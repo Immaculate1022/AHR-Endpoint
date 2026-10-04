@@ -37,7 +37,7 @@ report = {
     "notes": [
         "This audit verifies source-level safety gates; it is not a behavioral detection benchmark.",
         "This script does not compile or launch Rust; cargo fmt, cargo check, and cargo test were verified separately at the published commit.",
-        "Archived scoring candidates remain outside the active crate path.",
+        "Archived scoring candidates are retained for provenance; the version 06 candidate was merged into src/hollow.rs on 2026-10-04 with in-crate tests, dry-run behavior, audit logging, and human-authorization gates.",
     ],
 }
 print(json.dumps(report, indent=2, sort_keys=True))
