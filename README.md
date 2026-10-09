@@ -113,6 +113,12 @@ This repository is distributed under the [IOF Attribution License v1.0](LICENSE)
 **AHR-Endpoint · Gregory Scott Davis**  
 *Part of the Infinite Optical Fabric / PegaConstellation research constellation.*
 
+---
+
+## The IOF Collection
+
+Everything in this repo stays free and public. The complete Infinite Optical Fabric portfolio — test protocols, code, benchmarks, and theory documents — is also curated as one download: The Infinite Optical Fabric V.1 (https://infinitefabric.gumroad.com/l/lfgis — name-your-price, $15 minimum). Buying it changes nothing here; it's a way to support the work. The unified app for the whole portfolio is The Constellation: https://immaculate1022.github.io/The-Constellation
+
 ## Related project links
 
 - [PegaConstellation Hub](https://github.com/Immaculate1022/pegaconstellation-hub) — the ecosystem hub referenced above
